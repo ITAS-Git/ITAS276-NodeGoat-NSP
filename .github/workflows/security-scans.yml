@@ -2,9 +2,9 @@ name: Semgrep Snyk and Truffle Pig Scans
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
   trufflehog:
