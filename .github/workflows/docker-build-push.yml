@@ -27,4 +27,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: yourusername/yourrepository:latest  # Replace with your Docker Hub username and image repository
+          tags: apex6599/node-goat:latest  # Replace with your Docker Hub username and image repository
