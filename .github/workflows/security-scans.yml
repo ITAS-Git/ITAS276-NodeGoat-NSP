@@ -32,7 +32,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: lab5:latest
+          image: node-goat:latest
           args: --file=Dockerfile --sarif-file-output=snyk-results.sarif
       - name: Upload Snyk SARIF report
         uses: actions/upload-artifact@v3
