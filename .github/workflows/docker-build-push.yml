@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@master
 
       - name: Test files are visible
-        run:
+        run: |
           whoami
           ls
   build-and-push:
