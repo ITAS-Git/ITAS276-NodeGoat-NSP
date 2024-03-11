@@ -20,6 +20,8 @@ jobs:
         run: |
           whoami
           ls
+          docker-compose up -d
+          docker ps
   build-and-push:
     runs-on: ubuntu-latest
     steps:
