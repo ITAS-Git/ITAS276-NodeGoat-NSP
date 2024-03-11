@@ -5,8 +5,21 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+    
 
 jobs:
+  deploy:
+    name: "Deploy to ITAS WMD server"
+    runs-on: self-hosted
+
+    steps:
+      - name: Copy source code files
+        uses: actions/checkout@master
+
+      - name: Test files are visible
+        run:
+          whoami
+          ls
   build-and-push:
     runs-on: ubuntu-latest
     steps:
