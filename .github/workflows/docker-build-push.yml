@@ -18,7 +18,6 @@ jobs:
 
       - name: Test files are visible
         run: |
-          pwd
           whoami
           ls
           docker-compose up -d
