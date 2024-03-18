@@ -33,12 +33,12 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: node-goat:latest
-          args: --file=Dockerfile --sarif-file-output=snyk-results.sarif
+          args: --file=Dockerfile --serif-file-output=snyk.sarif
       - name: Upload Snyk SARIF report
         uses: actions/upload-artifact@v3
         with:
           name: snyk-sca.sarif
-          path: snyk-results.sarif
+          path: snyk.sarif
 
   SAST-Semgrep:
     needs: [trufflehog]
