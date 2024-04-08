@@ -1,0 +1,111 @@
+# ITAS 276 DevSecOps Final Assignment 3
+
+
+![PipeLine Results Screenshot 1](https://cdn.discordapp.com/attachments/1226943702090387517/1226983177042526309/Screenshot_2024-04-08_124205.png?ex=6626c021&is=66144b21&hm=1b24167ec68525caef906832f3d245451b4456262d14f5d1196e13f635ee073d&)
+
+![PipeLine Results Screenshot 2](https://cdn.discordapp.com/attachments/1226943702090387517/1226983176753123458/Screenshot_2024-04-08_124253.png?ex=6626c021&is=66144b21&hm=6e6e8d016b94fb52a8764f64c79cca8048d95e4903f28c368243a8ed65b80887&)
+
+
+```yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  Discord-Begin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord Notification start
+        id: discord-begin
+        uses: tsickert/discord-webhook@v5.3.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          thread-id: "1226943702090387517"
+          username: ${{github.repository}}
+          avatar-url: https://cdn3.iconfinder.com/data/icons/corgi-dog-emoji/500/Angry_corgi_dog_emoticon_1-512.png
+          content: |
+            :rocket: Security Pipeline jobs are starting...
+            Triggered by: ${{ github.triggering_actor }}
+            Run ID: ${{ github.run_id }}
+            [Action details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+  trufflehog:
+    needs: [Discord-Begin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Secret Scanning with TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+          
+  SCA-Snyk:
+    needs: [Discord-Begin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build a Docker image
+        run: docker build -t node-goat:latest .
+      - name: Run Snyk to check Docker image for vulnerabilities
+        continue-on-error: true
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: node-goat:latest
+          args: --file=Dockerfile --sarif-file-output=snyk.sarif
+      - name: Upload Snyk SARIF report
+        uses: actions/upload-artifact@v3
+        with:
+          name: snyk-sca.sarif
+          path: snyk.sarif
+          
+  SAST-Semgrep:
+    needs: [Discord-Begin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Semgrep Scan
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" returntocorp/semgrep semgrep --config=p/r2c-ci --sarif --output=/src/semgrep-sast.sarif /src
+          
+      - name: Upload Semgrep SARIF report
+        uses: actions/upload-artifact@v3
+        with:
+          name: semgrep-sast.sarif
+          path: semgrep-sast.sarif
+          
+  Discord-Notification:
+    needs: [trufflehog, SCA-Snyk, SAST-Semgrep]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Update Discord Notification
+      uses: tsickert/discord-webhook@v5.3.0
+      with:
+        webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+        thread-id: "1226943702090387517"
+        username: ${{github.repository}}
+        avatar-url: https://cdn3.iconfinder.com/data/icons/corgi-dog-emoji/500/Angry_corgi_dog_emoticon_1-512.png
+        content: |
+          :white_check_mark: Pipeline completed!
+          Triggered by: ${{ github.triggering_actor }}
+          Run ID: ${{ github.run_id }}
+          [Action details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          Job Statuses:
+          - Trufflehog: ${{ needs.trufflehog.result }}
+          - SCA Snyk: ${{ needs.SCA-Snyk.result }}
+          - SAST Semgrep: ${{ needs.SAST-Semgrep.result }}
+
+          Artifacts:
+          - [Snyk SARIF Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
+          - [Semgrep SARIF Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
+```
