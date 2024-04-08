@@ -29,6 +29,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: apex6599/node-goat:latest
+          
 
   trufflehog:
     runs-on: ubuntu-latest
