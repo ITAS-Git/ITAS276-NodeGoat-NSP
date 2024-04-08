@@ -170,12 +170,18 @@ jobs:
       uses: tsickert/discord-webhook@v5.3.0
       with:
         webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+        thread-id: "1226943702090387517"
         username: ${{github.repository}}
-        avatar-url: https://gravatar.com/avatar/be5d3fe06696117c467f199ddb4f1aed?s=400&d=robohash&r=g
-        embed-title: "${{ github.workflow }} Pipeline ${{ job.status }}"
-        embed-description: |
+        avatar-url: https://cdn3.iconfinder.com/data/icons/corgi-dog-emoji/500/Angry_corgi_dog_emoticon_1-512.png
+        content: |
+          ${{ github.workflow }} Pipeline ${{ job.status }}
           Pipeline for ${{ github.repository }} ${{ job.status }}.
           Triggered by: ${{ github.triggering_actor }}
-          Run ID: ${{ github.run_id }} 
-        embed-color: ${{ job.status == 'success' && 65280 || 16711680 }}
-        embed-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          Run ID: ${{ github.run_id }}
+        embeds: |
+          [{
+            "title": "${{ github.workflow }} Pipeline ${{ job.status }}",
+            "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "description": "Pipeline for ${{ github.repository }} ${{ job.status }}.\nTriggered by: ${{ github.triggering_actor }}\nRun ID: ${{ github.run_id }}",
+            "color": ${{ job.status == 'success' && 65280 || 16711680 }}
+          }]
