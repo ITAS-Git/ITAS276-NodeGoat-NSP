@@ -15,13 +15,6 @@ jobs:
     steps:
       - name: Copy source code files
         uses: actions/checkout@master
-
-      - name: Test files are visible
-        run: |
-          whoami
-          ls
-          docker-compose up -d
-          docker ps
   build-and-push:
     runs-on: ubuntu-latest
     steps:
@@ -42,9 +35,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: apex6599/node-goat:latest  # Replace with your Docker Hub username and image repository
-
-
+          tags: apex6599/node-goat:latest
   Discord-Begin:
       # Post a message to the ITAS Discord channel with pipeline updates.
       runs-on: ubuntu-latest
@@ -59,3 +50,4 @@ jobs:
           embed-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           embed-description: "[Action details ${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           embed-author-name: "${{ github.triggering_actor }}"
+          thread-id: "1226943702090387517"
