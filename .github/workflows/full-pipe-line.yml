@@ -7,7 +7,25 @@ on:
     branches: [ "master" ]
 
 jobs:
+  Discord-Begin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord Notification start
+        id: discord-begin
+        uses: tsickert/discord-webhook@v5.3.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          thread-id: "1226943702090387517"
+          username: ${{github.repository}}
+          avatar-url: https://cdn3.iconfinder.com/data/icons/corgi-dog-emoji/500/Angry_corgi_dog_emoticon_1-512.png
+          content: |
+            :rocket: Security Pipeline jobs are starting...
+            Triggered by: ${{ github.triggering_actor }}
+            Run ID: ${{ github.run_id }}
+            [Action details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
   trufflehog:
+    needs: [Discord-Begin]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,7 +38,7 @@ jobs:
           extra_args: --only-verified
           
   SCA-Snyk:
-    needs: [trufflehog]
+    needs: [Discord-Begin]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -41,7 +59,7 @@ jobs:
           path: snyk.sarif
           
   SAST-Semgrep:
-    needs: [trufflehog]  
+    needs: [Discord-Begin]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -56,11 +74,11 @@ jobs:
           path: semgrep-sast.sarif
           
   Discord-Notification:
-    needs: [ trufflehog, SCA-Snyk, SAST-Semgrep ]
+    needs: [trufflehog, SCA-Snyk, SAST-Semgrep]
     if: always()
     runs-on: ubuntu-latest
     steps:
-    - name: Discord Notification
+    - name: Update Discord Notification
       uses: tsickert/discord-webhook@v5.3.0
       with:
         webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
@@ -68,14 +86,16 @@ jobs:
         username: ${{github.repository}}
         avatar-url: https://cdn3.iconfinder.com/data/icons/corgi-dog-emoji/500/Angry_corgi_dog_emoticon_1-512.png
         content: |
-          ${{ github.workflow }} Pipeline ${{ job.status }}
-          Pipeline for ${{ github.repository }} ${{ job.status }}.
+          :white_check_mark: Pipeline completed!
           Triggered by: ${{ github.triggering_actor }}
           Run ID: ${{ github.run_id }}
-        embeds: |
-          [{
-            "title": "${{ github.workflow }} Pipeline ${{ job.status }}",
-            "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "description": "Pipeline for ${{ github.repository }} ${{ job.status }}.\nTriggered by: ${{ github.triggering_actor }}\nRun ID: ${{ github.run_id }}",
-            "color": ${{ job.status == 'success' && 65280 || 16711680 }}
-          }]
+          [Action details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          Job Statuses:
+          - Trufflehog: ${{ needs.trufflehog.result }}
+          - SCA Snyk: ${{ needs.SCA-Snyk.result }}
+          - SAST Semgrep: ${{ needs.SAST-Semgrep.result }}
+
+          Artifacts:
+          - [Snyk SARIF Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
+          - [Semgrep SARIF Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
