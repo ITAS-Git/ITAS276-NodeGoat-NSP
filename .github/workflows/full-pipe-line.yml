@@ -43,6 +43,7 @@ jobs:
         with:
           extra_args: --only-verified
 
+
   SCA-Snyk:
     needs: [trufflehog]
     runs-on: ubuntu-latest
