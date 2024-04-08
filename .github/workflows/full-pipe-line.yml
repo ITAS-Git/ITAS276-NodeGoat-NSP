@@ -1,0 +1,180 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: apex6599/node-goat:latest
+
+  trufflehog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Secret Scanning with TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
+  SCA-Snyk:
+    needs: [trufflehog]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build a Docker image
+        run: docker build -t node-goat:latest .
+      - name: Run Snyk to check Docker image for vulnerabilities
+        continue-on-error: true
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: node-goat:latest
+          args: --file=Dockerfile --serif-file-output=snyk.sarif
+      - name: Upload Snyk SARIF report
+        uses: actions/upload-artifact@v3
+        with:
+          name: snyk-sca.sarif
+          path: snyk.sarif
+
+  SAST-Semgrep:
+    needs: [trufflehog]  
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Semgrep Scan
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" returntocorp/semgrep semgrep --config=p/r2c-ci --sarif --output=/src/semgrep-sast.sarif /src
+          
+      - name: Upload Semgrep SARIF report
+        uses: actions/upload-artifact@v3
+        with:
+          name: semgrep-sast.sarif
+          path: semgrep-sast.sarif
+
+  e2e-test:
+    name: Node.js 
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["10.x", "12.x", "14.x"]
+        
+    steps:
+      - name: Checkout https://github.com/${{ github.repository }}@${{ github.ref }}
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+          
+      - name: Set up Node.js ${{ matrix.node-version }}  
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          
+      - name: Use cache  
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.npm
+            ~/.cache 
+          key: ${{ runner.os }}-node${{ matrix.node-version }}-E2E-${{ hashFiles('package-lock.json') }}
+          
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run cy:verify
+          
+      - name: Start MongoDB
+        run: |
+          docker run -d -p 27017:27017 mongo:4.0
+          timeout 60s bash -c 'until nc -z -w 2 localhost 27017 && echo MongoDB ready; do sleep 2; done'
+          
+      - name: Run E2E test suite
+        id: test-suite 
+        run: |
+          NODE_ENV=test npm start -- --silent &
+          npm run test:ci -- --config video=true
+          
+      - name: Prepare cypress artifacts
+        if: failure() && (steps.test-suite.outcome == 'failure')
+        working-directory: ./test/e2e
+        run: >
+          mkdir -p "screenshots" && find "screenshots" -mindepth 1 -maxdepth 1 -type d
+          -exec sh -c 'mv -- "videos/$(basename "$1").mp4" "$1"' _ {} \;
+          
+      - name: Upload cypress artifacts 
+        if: failure() && (steps.test-suite.outcome == 'failure')
+        uses: actions/upload-artifact@v2
+        with: 
+          name: cypress-artifacts-node${{ matrix.node-version }}
+          path: test/e2e/screenshots
+            
+  lint:
+    name: Node.js
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["14.x"]
+        
+    steps:
+      - name: Checkout https://github.com/${{ github.repository }}@${{ github.ref }}
+        uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+          
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          
+      - name: Run linter  
+        run: npx --no-install jshint@2.12.0 .
+
+  Discord-Notification:
+    needs: [build-and-push, trufflehog, SCA-Snyk, SAST-Semgrep, e2e-test, lint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Discord Notification
+      uses: tsickert/discord-webhook@v5.3.0
+      with:
+        webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+        username: ${{github.repository}}
+        avatar-url: https://gravatar.com/avatar/be5d3fe06696117c467f199ddb4f1aed?s=400&d=robohash&r=g
+        thread-id: "1226943702090387517"  
+        embed-title: "${{ github.workflow }} Pipeline ${{ job.status }}"
+        embed-description: |
+          Pipeline for ${{ github.repository }} ${{ job.status }}.
+          Triggered by: ${{ github.triggering_actor }}
+          Run ID: ${{ github.run_id }} 
+        embed-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        embed-color: ${{ job.status == 'success' && '0x00ff00' || '0xff0000' }}
