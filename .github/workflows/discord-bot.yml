@@ -1,4 +1,4 @@
-name: Security Pipeline
+name: Discord CI/CD Webhook
 
 on:
   push:
@@ -7,25 +7,17 @@ on:
     branches: [main]
 
 jobs:
-
-  # Your other jobs (job1, job2, etc.) would be defined here
-
-  Discord-Completed:
-    if: always()
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Discord Notification
-      uses: tsickert/discord-webhook@v5.3.0
-      with:
-        webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
-        username: ${{ github.repository }}
-        avatar-url: https://gravatar.com/avatar/be5d3fe06696117c467f199ddb4f1aed?s=400&d=robohash&r=g
-        embed-title: Security Pipeline completed
-        embed-description: |
-          Pipeline for ${{ github.repository }} completed.
-          Triggered by: ${{ github.triggering_actor }}
-          Run ID: ${{ github.run_id }}
-          Status: ${{ job.status }}
-        embed-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        embed-color: ${{ job.status == 'success' && '0x00ff00' || '0xff0000' }}
+    # Post a message to the ITAS Discord channel with pipeline updates.
+    Discord-Begin:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Discord Notification start
+        uses: tsickert/discord-webhook@v5.3.0
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          username: ${{github.repository}}
+          avatar-url: https://gravatar.com/avatar/be5d3fe06696117c467f199ddb4f1aed?s=400&d=robohash&r=g
+          embed-title: "Security Pipeline jobs are starting..."
+          embed-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          embed-description: "[Action details ${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          embed-author-name: "${{ github.triggering_actor }}"
